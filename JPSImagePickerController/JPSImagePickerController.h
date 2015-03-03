@@ -7,10 +7,14 @@
 //
 
 #import <UIKit/UIKit.h>
+#import <AVFoundation/AVFoundation.h>
 
 @protocol JPSImagePickerDelegate;
 
 @interface JPSImagePickerController : UIViewController
+
+- (id)initWithDelegate:(id<JPSImagePickerDelegate>)delegate
+              position:(AVCaptureDevicePosition)position;
 
 #pragma mark - Feature Flags
 
@@ -30,23 +34,17 @@
 // Background color of string shown overlayed on image in confirmation screen, default nil
 @property (nonatomic, strong) UIColor  *confirmationOverlayBackgroundColor;
 
-#pragma mark - Delegate
-
-@property (nonatomic, weak) id<JPSImagePickerDelegate> delegate;
-
 @end
 
 #pragma mark - Protocol
 
 @protocol JPSImagePickerDelegate <NSObject>
 
-@optional
-
 // Called immediately after the picture was taken
-- (void)picker:(JPSImagePickerController *)picker didTakePicture:(UIImage *)picture;
+- (void)jpsImagePicker:(JPSImagePickerController *)picker didTakePicture:(UIImage *)picture;
 // Called immediately after the "Use" button was tapped
-- (void)picker:(JPSImagePickerController *)picker didConfirmPicture:(UIImage *)picture;
+- (void)jpsImagePicker:(JPSImagePickerController *)picker didConfirmPicture:(UIImage *)picture;
 // Called immediately after the "Cancel" button was tapped
-- (void)pickerDidCancel:(JPSImagePickerController *)picker;
+- (void)jpsImagePickerDidCancel:(JPSImagePickerController *)picker;
 
 @end

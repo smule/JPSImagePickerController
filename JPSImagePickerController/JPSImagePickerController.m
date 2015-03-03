@@ -8,7 +8,6 @@
 
 #import "JPSImagePickerController.h"
 #import "JPSCameraButton.h"
-#import <AVFoundation/AVFoundation.h>
 #import "JPSVolumeButtonHandler.h"
 
 @interface JPSImagePickerController () <UIScrollViewDelegate>
@@ -19,6 +18,7 @@
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer * capturePreviewLayer;
 @property (nonatomic, strong) NSOperationQueue           * captureQueue;
 @property (nonatomic, assign) UIImageOrientation           imageOrientation;
+@property (nonatomic, assign) AVCaptureDevicePosition      cameraPosition;
 
 // Camera Controls
 @property (nonatomic, strong) UIButton *cameraButton;
@@ -37,16 +37,21 @@
 @property (nonatomic, strong) UILabel * confirmationLabel;
 @property (nonatomic, strong) UILabel * confirmationOverlayLabel;
 
+@property (nonatomic, weak) id<JPSImagePickerDelegate> delegate;
+
 @end
 
 @implementation JPSImagePickerController
 
-- (id)init {
-    self = [super init];
+- (id)initWithDelegate:(id<JPSImagePickerDelegate>)delegate position:(AVCaptureDevicePosition)position {
+    self = [self init];
     if (self) {
         self.editingEnabled = YES;
         self.zoomEnabled = YES;
         self.volumeButtonTakesPicture = YES;
+        
+        self.delegate = delegate;
+        self.cameraPosition = position;
     }
     return self;
 }
@@ -64,7 +69,9 @@
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    
     [self enableCapture];
+    [self updateFlashButton];
 }
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -139,7 +146,7 @@
     self.cancelButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.cancelButton.titleLabel.font = [UIFont systemFontOfSize:18.0f];
     self.cancelButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.cancelButton setTitle:@"Cancel" forState:UIControlStateNormal];
+    [self.cancelButton setTitle:NSLocalizedStringFromTable(@"camera.cancel", @"jps-image", @"Cancel") forState:UIControlStateNormal];
     [self.cancelButton addTarget:self action:@selector(dismiss) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.cancelButton];
     
@@ -163,9 +170,8 @@
 - (void)addFlashButton {
     self.flashButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.flashButton.translatesAutoresizingMaskIntoConstraints = NO;
-    UIImage *flashButtonImage = [[UIImage imageNamed:@"JPSImagePickerController.bundle/flash_button"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+    UIImage *flashButtonImage = [[UIImage imageNamed:@"flash_button"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
     [self.flashButton setImage:flashButtonImage forState:UIControlStateNormal];
-    [self.flashButton setTitle:@" On" forState:UIControlStateNormal];
     [self.flashButton addTarget:self action:@selector(didPressFlashButton) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.flashButton];
     
@@ -189,7 +195,7 @@
 - (void)addCameraSwitchButton {
     self.cameraSwitchButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.cameraSwitchButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.cameraSwitchButton setBackgroundImage:[UIImage imageNamed:@"JPSImagePickerController.bundle/camera_switch_button"] forState:UIControlStateNormal];
+    [self.cameraSwitchButton setBackgroundImage:[UIImage imageNamed:@"camera_switch_button"] forState:UIControlStateNormal];
     [self.cameraSwitchButton addTarget:self action:@selector(didPressCameraSwitchButton) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.cameraSwitchButton];
     
@@ -232,7 +238,7 @@
 - (NSBlockOperation *)captureOperation {
     NSBlockOperation *operation = [NSBlockOperation blockOperationWithBlock:^{
         self.session = [[AVCaptureSession alloc] init];
-        AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+        AVCaptureDevice *device = [self activeCamera];
         NSError *error = nil;
         
         AVCaptureDeviceInput *input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
@@ -256,6 +262,7 @@
         self.capturePreviewLayer = [[AVCaptureVideoPreviewLayer alloc] initWithSession:self.session];
         self.capturePreviewLayer.frame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height - 69.0f - 73.0f);
         self.capturePreviewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+        [self updateVideoOrientation];
         
         // Still Image Output
         AVCaptureStillImageOutput *stillOutput = [[AVCaptureStillImageOutput alloc] init];
@@ -276,9 +283,6 @@
         [self.view insertSubview:self.capturePreviewView atIndex:0];
         [self.capturePreviewView.layer addSublayer:self.capturePreviewLayer];
         [self.session startRunning];
-        if ([[self currentDevice] hasFlash]) {
-            self.flashButton.hidden = NO;
-        }
         if ([UIImagePickerController isCameraDeviceAvailable:UIImagePickerControllerCameraDeviceFront] &&
             [UIImagePickerController isCameraDeviceAvailable:UIImagePickerControllerCameraDeviceRear]) {
             self.cameraSwitchButton.hidden = NO;
@@ -286,13 +290,18 @@
     });
 }
 
-- (AVCaptureDevice *)frontCamera {
+- (AVCaptureDevice *)activeCamera {
+    return [self cameraForPosition:self.cameraPosition];
+}
+
+- (AVCaptureDevice *)cameraForPosition:(AVCaptureDevicePosition)position {
     NSArray *devices = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
     for (AVCaptureDevice *device in devices) {
-        if (device.position == AVCaptureDevicePositionFront) {
+        if (device.position == position) {
             return device;
         }
     }
+    
     return nil;
 }
 
@@ -307,7 +316,10 @@
     
     AVCaptureStillImageOutput *output = self.session.outputs.lastObject;
     AVCaptureConnection *videoConnection = output.connections.lastObject;
-    if (!videoConnection) return;
+    if (!videoConnection) {
+        [self showPreview];
+        return;
+    }
     
     self.cameraButton.enabled = NO;
     [output captureStillImageAsynchronouslyFromConnection:videoConnection
@@ -315,26 +327,37 @@
                                             if (!imageDataSampleBuffer || error) return;
                                             
                                             NSData *imageData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageDataSampleBuffer];
-                                            self.imageOrientation = [JPSImagePickerController currentImageOrientation];
                                             UIImage *image = [UIImage imageWithCGImage:[[[UIImage alloc] initWithData:imageData] CGImage]
                                                                                  scale:1.0f
-                                                                           orientation:self.imageOrientation];
+                                                                           orientation:[self currentImageOrientation]];
                                             self.previewImage = image;
                                             if (self.editingEnabled) {
                                                 [self showPreview];
-                                            } else {
-                                                [self dismiss];
                                             }
-                                            if ([self.delegate respondsToSelector:@selector(picker:didTakePicture:)]) {
-                                                [self.delegate picker:self didTakePicture:image];
-                                            }
+                                            
+                                            [self.delegate jpsImagePicker:self didTakePicture:image];
                                         }];
 }
 
 - (void)dismiss {
-    if ([self.delegate respondsToSelector:@selector(pickerDidCancel:)]) {
-        [self.delegate pickerDidCancel:self];
+    [self.delegate jpsImagePickerDidCancel:self];
+}
+
+- (void)updateFlashButton {
+    AVCaptureDevice *device = [self currentDevice];
+    NSString *flashTitle = nil;
+    
+    switch (device.flashMode) {
+        case AVCaptureFlashModeOn:
+            flashTitle = NSLocalizedStringFromTable(@"camera.flash_on", @"jps-image", @"Flash On");
+            break;
+        default:
+            flashTitle = NSLocalizedStringFromTable(@"camera.flash_off", @"jps-image", @"Flass Off");
+            break;
     }
+    
+    [self.flashButton setTitle:flashTitle forState:UIControlStateNormal];
+    self.flashButton.hidden = ![device hasFlash];
 }
 
 - (void)didPressFlashButton {
@@ -346,11 +369,11 @@
     if (!error) {
         if (device.flashMode == AVCaptureFlashModeOff) {
             device.flashMode = AVCaptureFlashModeOn;
-            [self.flashButton setTitle:@" On" forState:UIControlStateNormal];
         } else {
             device.flashMode = AVCaptureFlashModeOff;
-            [self.flashButton setTitle:@" Off" forState:UIControlStateNormal];
         }
+        
+        [self updateFlashButton];
     }
     [device unlockForConfiguration];
 }
@@ -361,28 +384,27 @@
     
     // Input Switch
     NSBlockOperation *operation = [NSBlockOperation blockOperationWithBlock:^{
-        AVCaptureDevice *frontCamera = [self frontCamera];
-        AVCaptureDevice *backCamera = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
-        AVCaptureDeviceInput *input = self.session.inputs.firstObject;
-        
-        AVCaptureDevice *newCamera = nil;
-        
-        if (input.device.position == AVCaptureDevicePositionBack) {
-            newCamera = frontCamera;
-        } else {
-            newCamera = backCamera;
+        switch (self.cameraPosition) {
+            case AVCaptureDevicePositionFront:
+                self.cameraPosition = AVCaptureDevicePositionBack;
+                break;
+            default:
+                self.cameraPosition = AVCaptureDevicePositionFront;
+                break;
         }
+        
+        AVCaptureDevice *camera = [self activeCamera];
         
         // Should the flash button still be displayed?
         dispatch_async(dispatch_get_main_queue(), ^{
-            self.flashButton.hidden = !newCamera.isFlashAvailable;
+            self.flashButton.hidden = !camera.isFlashAvailable;
         });
         
         // Remove previous camera, and add new
-        [self.session removeInput:input];
+        [self.session removeInput:[self.session.inputs firstObject]];
         NSError *error = nil;
         
-        input = [AVCaptureDeviceInput deviceInputWithDevice:newCamera error:&error];
+        AVCaptureDeviceInput *input = [AVCaptureDeviceInput deviceInputWithDevice:camera error:&error];
         if (!input) return;
         [self.session addInput:input];
     }];
@@ -455,7 +477,7 @@
     self.retakeButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.retakeButton.titleLabel.font = [UIFont systemFontOfSize:18.0f];
     self.retakeButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.retakeButton setTitle:@"Retake" forState:UIControlStateNormal];
+    [self.retakeButton setTitle:NSLocalizedStringFromTable(@"camera.retake", @"jps-image", @"Retake") forState:UIControlStateNormal];
     [self.retakeButton addTarget:self action:@selector(retake) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.retakeButton];
     
@@ -484,7 +506,7 @@
     self.useButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.useButton.titleLabel.font = [UIFont systemFontOfSize:18.0f];
     self.useButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.useButton setTitle:@"Use" forState:UIControlStateNormal];
+    [self.useButton setTitle:NSLocalizedStringFromTable(@"camera.use", @"jps-image", @"Use") forState:UIControlStateNormal];
     [self.useButton addTarget:self action:@selector(use) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.useButton];
     
@@ -623,50 +645,73 @@
     
     self.cameraButton.hidden = NO;
     self.cancelButton.hidden = NO;
-    self.flashButton.hidden = NO;
     self.cameraSwitchButton.hidden = NO;
     self.capturePreviewLayer.hidden = NO;
     
     self.cameraButton.enabled = YES;
+    [self updateFlashButton];
 }
 
 - (void)use {
-    if ([self.delegate respondsToSelector:@selector(picker:didConfirmPicture:)]) {
-        [self.delegate picker:self didConfirmPicture:self.previewImage];
-    }
-    [self dismiss];
+    [self.delegate jpsImagePicker:self didConfirmPicture:self.previewImage];
 }
 
 #pragma mark - Orientation
 
-- (NSUInteger)supportedInterfaceOrientations {
-    return UIInterfaceOrientationMaskPortrait;
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self updateVideoOrientation];
 }
 
-+ (UIImageOrientation)currentImageOrientation {
-    // This is weird, but it works
-    // By all means fix it, but make sure to test it afterwards
-    UIDeviceOrientation deviceOrientation = [[UIDevice currentDevice] orientation];
-    UIImageOrientation imageOrientation = UIImageOrientationRight;
+- (void)updateVideoOrientation {
+    self.capturePreviewLayer.connection.videoOrientation = [self currentVideoOrientation];
+}
+
+- (AVCaptureVideoOrientation)currentVideoOrientation {
+    UIInterfaceOrientation deviceOrientation = [[UIApplication sharedApplication] statusBarOrientation];
     
     switch (deviceOrientation) {
-        case UIDeviceOrientationLandscapeLeft:
-            imageOrientation = UIImageOrientationUp;
-            break;
-            
-        case UIDeviceOrientationLandscapeRight:
-            imageOrientation = UIImageOrientationDown;
-            break;
-            
-        case UIDeviceOrientationPortraitUpsideDown:
-            imageOrientation = UIImageOrientationLeft;
-            break;
-            
+        case UIInterfaceOrientationPortraitUpsideDown:
+            return AVCaptureVideoOrientationPortraitUpsideDown;
+        case UIInterfaceOrientationLandscapeLeft:
+            return AVCaptureVideoOrientationLandscapeLeft;
+        case UIInterfaceOrientationLandscapeRight:
+            return AVCaptureVideoOrientationLandscapeRight;
+        case UIInterfaceOrientationPortrait:
         default:
-            break;
+            return AVCaptureVideoOrientationPortrait;
     }
+}
+
+- (UIImageOrientation)currentImageOrientation {
+    UIInterfaceOrientation deviceOrientation = [[UIApplication sharedApplication] statusBarOrientation];
     
-    return imageOrientation;
+    switch (deviceOrientation) {
+        case UIInterfaceOrientationLandscapeLeft:
+            if (self.cameraPosition == AVCaptureDevicePositionFront) {
+                return UIImageOrientationUpMirrored;
+            } else {
+                return UIImageOrientationDown;
+            }
+        case UIInterfaceOrientationLandscapeRight:
+            if (self.cameraPosition == AVCaptureDevicePositionFront) {
+                return UIImageOrientationDownMirrored;
+            } else {
+                return UIImageOrientationUp;
+            }
+        case UIInterfaceOrientationPortraitUpsideDown:
+            if (self.cameraPosition == AVCaptureDevicePositionFront) {
+                return UIImageOrientationLeftMirrored;
+            } else {
+                return UIImageOrientationRight;
+            }
+        default:
+            if (self.cameraPosition == AVCaptureDevicePositionFront) {
+                return UIImageOrientationRightMirrored;
+            } else {
+                return UIImageOrientationLeft;
+            }
+    }
 }
 
 @end
