@@ -12,6 +12,6 @@ Pod::Spec.new do |s|
 
   s.source_files = 'JPSImagePickerController/*.{h,m}'
   s.framework    = 'MediaPlayer', 'AVFoundation'
-  s.resources    = 'JPSImagePickerController/*.lproj', 'JPSImagePickerController/JPSImagePickerController.bundle'
+  s.resources    = 'JPSImagePickerController/JPSImagePickerController.bundle'
   s.requires_arc = true
 end

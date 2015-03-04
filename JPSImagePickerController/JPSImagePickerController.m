@@ -43,6 +43,17 @@
 
 @implementation JPSImagePickerController
 
++(NSBundle *)bundle
+{
+    static NSBundle *bundle;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^
+    {
+        bundle = [NSBundle bundleWithPath:[[NSBundle mainBundle] pathForResource:@"JPSImagePickerController" ofType:@"bundle"]];
+    });
+    return bundle;
+}
+
 - (id)initWithDelegate:(id<JPSImagePickerDelegate>)delegate position:(AVCaptureDevicePosition)position {
     self = [self init];
     if (self) {
@@ -146,7 +157,8 @@
     self.cancelButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.cancelButton.titleLabel.font = [UIFont systemFontOfSize:18.0f];
     self.cancelButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.cancelButton setTitle:NSLocalizedStringFromTable(@"camera.cancel", @"jps-image", @"Cancel") forState:UIControlStateNormal];
+    NSString *title = NSLocalizedStringWithDefaultValue(@"cancel", nil, [JPSImagePickerController bundle], @"Cancel", nil);
+    [self.cancelButton setTitle:title forState:UIControlStateNormal];
     [self.cancelButton addTarget:self action:@selector(dismiss) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.cancelButton];
     
@@ -170,7 +182,8 @@
 - (void)addFlashButton {
     self.flashButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.flashButton.translatesAutoresizingMaskIntoConstraints = NO;
-    UIImage *flashButtonImage = [[UIImage imageNamed:@"flash_button"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+    UIImage *flashButtonImage = [[UIImage imageNamed:@"flash_button" inBundle:[JPSImagePickerController bundle] compatibleWithTraitCollection:nil]
+                                          imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
     [self.flashButton setImage:flashButtonImage forState:UIControlStateNormal];
     [self.flashButton addTarget:self action:@selector(didPressFlashButton) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.flashButton];
@@ -195,7 +208,8 @@
 - (void)addCameraSwitchButton {
     self.cameraSwitchButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.cameraSwitchButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.cameraSwitchButton setBackgroundImage:[UIImage imageNamed:@"camera_switch_button"] forState:UIControlStateNormal];
+    [self.cameraSwitchButton setBackgroundImage:[UIImage imageNamed:@"camera_switch_button" inBundle:[JPSImagePickerController bundle] compatibleWithTraitCollection:nil]
+                                       forState:UIControlStateNormal];
     [self.cameraSwitchButton addTarget:self action:@selector(didPressCameraSwitchButton) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.cameraSwitchButton];
     
@@ -349,10 +363,10 @@
     
     switch (device.flashMode) {
         case AVCaptureFlashModeOn:
-            flashTitle = NSLocalizedStringFromTable(@"camera.flash_on", @"jps-image", @"Flash On");
+            flashTitle = NSLocalizedStringWithDefaultValue(@"flash_on", nil, [JPSImagePickerController bundle], @"Flash On", nil);
             break;
         default:
-            flashTitle = NSLocalizedStringFromTable(@"camera.flash_off", @"jps-image", @"Flass Off");
+            flashTitle = NSLocalizedStringWithDefaultValue(@"flash_off", nil, [JPSImagePickerController bundle], @"Flash Off", nil);
             break;
     }
     
@@ -477,7 +491,8 @@
     self.retakeButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.retakeButton.titleLabel.font = [UIFont systemFontOfSize:18.0f];
     self.retakeButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.retakeButton setTitle:NSLocalizedStringFromTable(@"camera.retake", @"jps-image", @"Retake") forState:UIControlStateNormal];
+    [self.retakeButton setTitle:NSLocalizedStringWithDefaultValue(@"retake", nil, [JPSImagePickerController bundle], @"Retake", nil)
+                       forState:UIControlStateNormal];
     [self.retakeButton addTarget:self action:@selector(retake) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.retakeButton];
     
@@ -506,7 +521,8 @@
     self.useButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.useButton.titleLabel.font = [UIFont systemFontOfSize:18.0f];
     self.useButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.useButton setTitle:NSLocalizedStringFromTable(@"camera.use", @"jps-image", @"Use") forState:UIControlStateNormal];
+    [self.useButton setTitle:NSLocalizedStringWithDefaultValue(@"use", nil, [JPSImagePickerController bundle], @"Use", nil)
+                    forState:UIControlStateNormal];
     [self.useButton addTarget:self action:@selector(use) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.useButton];
     
