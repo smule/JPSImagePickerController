@@ -182,8 +182,7 @@
 - (void)addFlashButton {
     self.flashButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.flashButton.translatesAutoresizingMaskIntoConstraints = NO;
-    UIImage *flashButtonImage = [[UIImage imageNamed:@"flash_button" inBundle:[JPSImagePickerController bundle] compatibleWithTraitCollection:nil]
-                                          imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+    UIImage *flashButtonImage = [[self getBundledImage:@"flash_button"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
     [self.flashButton setImage:flashButtonImage forState:UIControlStateNormal];
     [self.flashButton addTarget:self action:@selector(didPressFlashButton) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.flashButton];
@@ -208,8 +207,8 @@
 - (void)addCameraSwitchButton {
     self.cameraSwitchButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.cameraSwitchButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.cameraSwitchButton setBackgroundImage:[UIImage imageNamed:@"camera_switch_button" inBundle:[JPSImagePickerController bundle] compatibleWithTraitCollection:nil]
-                                       forState:UIControlStateNormal];
+    UIImage *cameraSwitchImage = [self getBundledImage:@"camera_switch_button"];
+    [self.cameraSwitchButton setBackgroundImage:cameraSwitchImage forState:UIControlStateNormal];
     [self.cameraSwitchButton addTarget:self action:@selector(didPressCameraSwitchButton) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.cameraSwitchButton];
     
@@ -670,6 +669,12 @@
 
 - (void)use {
     [self.delegate jpsImagePicker:self didConfirmPicture:self.previewImage];
+}
+
+- (UIImage *)getBundledImage:(NSString *)imageName {
+    NSBundle *imagePickerBundle = [JPSImagePickerController bundle];
+    NSURL *flashImagePathURL = [imagePickerBundle URLForResource:imageName withExtension:@"png"];
+    return [UIImage imageWithContentsOfFile:flashImagePathURL.path];
 }
 
 #pragma mark - Orientation
