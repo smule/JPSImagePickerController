@@ -9,6 +9,7 @@
 #import "JPSImagePickerController.h"
 #import "JPSCameraButton.h"
 #import "JPSVolumeButtonHandler.h"
+#import "UIImage+Rotation.h"
 
 @interface JPSImagePickerController () <UIScrollViewDelegate>
 
@@ -327,6 +328,7 @@
 - (void)takePicture {
     if (!self.cameraButton.enabled) return;
     
+    NSLog(@"------------------------------------- SNAP ---------------");
     AVCaptureStillImageOutput *output = self.session.outputs.lastObject;
     AVCaptureConnection *videoConnection = output.connections.lastObject;
     if (!videoConnection) {
@@ -335,14 +337,17 @@
     }
     
     self.cameraButton.enabled = NO;
+
     [output captureStillImageAsynchronouslyFromConnection:videoConnection
                                         completionHandler:^(CMSampleBufferRef imageDataSampleBuffer, NSError *error) {
                                             if (!imageDataSampleBuffer || error) return;
                                             
                                             NSData *imageData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageDataSampleBuffer];
+                                            //UIImage *image = [UIImage imageWithCGImage:[[[UIImage alloc] initWithData:imageData] CGImage]];
                                             UIImage *image = [UIImage imageWithCGImage:[[[UIImage alloc] initWithData:imageData] CGImage]
                                                                                  scale:1.0f
                                                                            orientation:[self currentImageOrientation]];
+                                            image = [UIImage scaleAndRotateImage:image];
                                             self.previewImage = image;
                                             if (self.editingEnabled) {
                                                 [self showPreview];
@@ -688,9 +693,10 @@
     self.capturePreviewLayer.connection.videoOrientation = [self currentVideoOrientation];
 }
 
+
+
 - (AVCaptureVideoOrientation)currentVideoOrientation {
     UIInterfaceOrientation deviceOrientation = [[UIApplication sharedApplication] statusBarOrientation];
-    
     switch (deviceOrientation) {
         case UIInterfaceOrientationPortraitUpsideDown:
             return AVCaptureVideoOrientationPortraitUpsideDown;
@@ -705,20 +711,23 @@
 }
 
 - (UIImageOrientation)currentImageOrientation {
-    UIInterfaceOrientation deviceOrientation = [[UIApplication sharedApplication] statusBarOrientation];
-    
+    //UIInterfaceOrientation deviceOrientation = [[UIApplication sharedApplication] statusBarOrientation];
+    UIDeviceOrientation deviceOrientation = [UIDevice currentDevice].orientation;
     switch (deviceOrientation) {
         case UIInterfaceOrientationLandscapeLeft:
             if (self.cameraPosition == AVCaptureDevicePositionFront) {
                 return UIImageOrientationUpMirrored;
+                //return UIImageOrientationUpMirrored; // was
             } else {
                 return UIImageOrientationDown;
+                //return UIImageOrientationDown; // was
             }
         case UIInterfaceOrientationLandscapeRight:
             if (self.cameraPosition == AVCaptureDevicePositionFront) {
                 return UIImageOrientationDownMirrored;
             } else {
                 return UIImageOrientationUp;
+                // return UIImageOrientationUp; // was
             }
         case UIInterfaceOrientationPortraitUpsideDown:
             if (self.cameraPosition == AVCaptureDevicePositionFront) {
@@ -726,9 +735,10 @@
             } else {
                 return UIImageOrientationRight;
             }
+        case UIInterfaceOrientationPortrait:
         default:
             if (self.cameraPosition == AVCaptureDevicePositionFront) {
-                return UIImageOrientationRightMirrored;
+                return UIImageOrientationLeftMirrored;
             } else {
                 return UIImageOrientationLeft;
             }
