@@ -9,6 +9,7 @@
 #import "JPSImagePickerController.h"
 #import "JPSCameraButton.h"
 #import "JPSVolumeButtonHandler.h"
+#import "JPSImageMask.h"
 #import "UIImage+Rotation.h"
 
 @interface JPSImagePickerController () <UIScrollViewDelegate>
@@ -40,6 +41,7 @@
 // Preview Top Area
 @property (nonatomic, strong) UILabel * confirmationLabel;
 @property (nonatomic, strong) UILabel * confirmationOverlayLabel;
+@property (nonatomic, strong) JPSImageMask *previewImageMask;
 
 @property (nonatomic, weak) id<JPSImagePickerDelegate> delegate;
 
@@ -327,6 +329,10 @@
 #endif
         [self.view insertSubview:self.capturePreviewView atIndex:0];
         [self.capturePreviewView.layer addSublayer:self.capturePreviewLayer];
+        [self addImageMask];
+        self.capturePreviewView.layer.mask = self.previewImageMask.layer;
+        [self.view sendSubviewToBack:self.previewImageMask];
+        [self.view sendSubviewToBack:self.capturePreviewView];
         [self.session startRunning];
         if ([UIImagePickerController isCameraDeviceAvailable:UIImagePickerControllerCameraDeviceFront] &&
             [UIImagePickerController isCameraDeviceAvailable:UIImagePickerControllerCameraDeviceRear]) {
@@ -523,6 +529,11 @@
     previewScrollView.contentSize = self.previewImageView.frame.size;
     previewScrollView.userInteractionEnabled = self.zoomEnabled;
     [self.view addSubview:previewScrollView];
+}
+
+- (void)addImageMask {
+    self.previewImageMask = [[JPSImageMask alloc] initWithFrame:self.view.bounds];
+    [self.view addSubview:self.previewImageMask];
 }
 
 - (void)addRetakeButton {
