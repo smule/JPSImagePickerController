@@ -20,6 +20,9 @@
 @property (nonatomic, strong) NSOperationQueue           * captureQueue;
 @property (nonatomic, assign) UIImageOrientation           imageOrientation;
 @property (nonatomic, assign) AVCaptureDevicePosition      cameraPosition;
+@property (nonatomic, assign) UIInterfaceOrientation       initialInterfaceOrientation;
+@property (nonatomic, assign) UIDeviceOrientation          previewDeviceOrientation;
+@property (nonatomic, assign) UIImageOrientation           previewImageOrientation;
 
 // Camera Controls
 @property (nonatomic, strong) UIButton *cameraButton;
@@ -77,6 +80,8 @@
     [self addCancelButton];
     [self addFlashButton];
     [self addCameraSwitchButton];
+    self.initialInterfaceOrientation = [[UIApplication sharedApplication] statusBarOrientation];
+
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -112,6 +117,32 @@
             [self takePicture];
         } downBlock:nil];
     }
+}
+
+/**
+ * Forces this image picker class to not rotate interfaces, because the image preview doesn't right itself
+ * after rotation, and you have to start dealing with upside-down images
+ * This avoids a whole addition layer of complexity in ensuring user is taking WYSIWYG photos
+ *
+ * WARNING: this method is deprecated in iOS 8, but I'm forced to include it at present for iOS 7 back compatibility
+ */
+- (NSUInteger)supportedInterfaceOrientations
+{
+    NSUInteger orientations;
+    switch ( self.initialInterfaceOrientation )
+    {
+        case UIInterfaceOrientationLandscapeLeft:
+            orientations = UIInterfaceOrientationMaskLandscapeLeft;
+            break;
+        case UIInterfaceOrientationLandscapeRight:
+            orientations = UIInterfaceOrientationMaskLandscapeRight;
+            break;
+        case UIInterfaceOrientationUnknown:
+        default:
+            orientations = UIInterfaceOrientationMaskLandscapeLeft | UIInterfaceOrientationMaskLandscapeRight;;
+            break;
+    }
+    return orientations;
 }
 
 #pragma mark - UI
@@ -328,7 +359,7 @@
 - (void)takePicture {
     if (!self.cameraButton.enabled) return;
     
-    NSLog(@"------------------------------------- SNAP ---------------");
+    NSLog(@"\n------------------------------------- SNAP ---------------\n");
     AVCaptureStillImageOutput *output = self.session.outputs.lastObject;
     AVCaptureConnection *videoConnection = output.connections.lastObject;
     if (!videoConnection) {
@@ -343,17 +374,24 @@
                                             if (!imageDataSampleBuffer || error) return;
                                             
                                             NSData *imageData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageDataSampleBuffer];
-                                            //UIImage *image = [UIImage imageWithCGImage:[[[UIImage alloc] initWithData:imageData] CGImage]];
-                                            UIImage *image = [UIImage imageWithCGImage:[[[UIImage alloc] initWithData:imageData] CGImage]
-                                                                                 scale:1.0f
-                                                                           orientation:[self currentImageOrientation]];
-                                            image = [UIImage scaleAndRotateImage:image];
-                                            self.previewImage = image;
+                                            
+                                            UIImage *rawCameraImage = [UIImage imageWithCGImage:[[[UIImage alloc] initWithData:imageData] CGImage]];
+                                            
+                                            self.previewImageOrientation = [self previewImageOrientation];
+                                            NSLog(@"PREVIEW IMAGE orientation:");
+                                            
+//                                            UIImage *rawCameraImage = [UIImage imageWithCGImage:[ [[UIImage alloc] initWithData:imageData] CGImage]
+//                                                                                 scale:1.0f
+//                                                                                     orientation:resolvedImageOrientation];
+                                            
+                                            UIImage *rotatedImage = [UIImage rotateImage:rawCameraImage toOrientation:self.previewImageOrientation];
+                                            
+                                            self.previewImage = rotatedImage;
                                             if (self.editingEnabled) {
                                                 [self showPreview];
                                             }
                                             
-                                            [self.delegate jpsImagePicker:self didTakePicture:image];
+                                            //[self.delegate jpsImagePicker:self didTakePicture:rotatedImage];
                                         }];
 }
 
@@ -673,7 +711,9 @@
 }
 
 - (void)use {
-    [self.delegate jpsImagePicker:self didConfirmPicture:self.previewImage];
+    UIImageOrientation finalImageOrientation = [self finalImageOrientation];
+    UIImage *finalImage = [UIImage rotateImage:self.previewImage toOrientation:finalImageOrientation];
+    [self.delegate jpsImagePicker:self didConfirmPicture:finalImage];
 }
 
 - (UIImage *)getBundledImage:(NSString *)imageName {
@@ -710,39 +750,152 @@
     }
 }
 
-- (UIImageOrientation)currentImageOrientation {
-    //UIInterfaceOrientation deviceOrientation = [[UIApplication sharedApplication] statusBarOrientation];
-    UIDeviceOrientation deviceOrientation = [UIDevice currentDevice].orientation;
-    switch (deviceOrientation) {
-        case UIInterfaceOrientationLandscapeLeft:
-            if (self.cameraPosition == AVCaptureDevicePositionFront) {
-                return UIImageOrientationUpMirrored;
-                //return UIImageOrientationUpMirrored; // was
-            } else {
-                return UIImageOrientationDown;
-                //return UIImageOrientationDown; // was
-            }
-        case UIInterfaceOrientationLandscapeRight:
-            if (self.cameraPosition == AVCaptureDevicePositionFront) {
-                return UIImageOrientationDownMirrored;
-            } else {
-                return UIImageOrientationUp;
-                // return UIImageOrientationUp; // was
-            }
-        case UIInterfaceOrientationPortraitUpsideDown:
-            if (self.cameraPosition == AVCaptureDevicePositionFront) {
-                return UIImageOrientationLeftMirrored;
-            } else {
-                return UIImageOrientationRight;
-            }
-        case UIInterfaceOrientationPortrait:
-        default:
-            if (self.cameraPosition == AVCaptureDevicePositionFront) {
-                return UIImageOrientationLeftMirrored;
-            } else {
-                return UIImageOrientationLeft;
-            }
+
+
+
+
+
+
+
+
+
+
+#pragma mark Image Preview Orientation
+
+- (UIImageOrientation)previewImageOrientation {
+    
+    NSLog(@"\n****** PREVIEW\n");
+
+    NSLog(@"CAMERA:");
+    
+    
+    UIImageOrientation returnImageOrientation;
+    if ( self.cameraPosition == AVCaptureDevicePositionFront )
+    {
+        returnImageOrientation = [self frontCameraPreviewImageOrientation];
     }
+    else
+    {
+        returnImageOrientation = [self backCameraPreviewImageOrientation];
+    }
+    NSLog(@"RETURNED image orientation:");
+    
+    return returnImageOrientation;
 }
+
+- (UIImageOrientation)frontCameraPreviewImageOrientation
+{
+    self.previewDeviceOrientation = [UIDevice currentDevice].orientation;
+        NSLog(@"DEVICE orientation");
+    
+        NSLog(@"INITIAL interface orientation");
+    
+    return  (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationUpMirrored : UIImageOrientationDownMirrored;
+    
+}
+
+
+
+
+- (UIImageOrientation)backCameraPreviewImageOrientation
+{
+    self.previewDeviceOrientation = [UIDevice currentDevice].orientation;
+    NSLog(@"DEVICE orientation");
+    
+    NSLog(@"INITIAL interface orientation");
+    
+    return  (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationDown : UIImageOrientationUp;
+
+}
+
+
+
+
+
+
+
+#pragma mark Image Final Orientation
+
+
+- (UIImageOrientation)finalImageOrientation {
+    
+    NSLog(@"\n****** FINAL!!!!\n");
+
+    NSLog(@"CAMERA:");
+    
+    
+    UIImageOrientation returnImageOrientation;
+    if ( self.cameraPosition == AVCaptureDevicePositionFront )
+    {
+        returnImageOrientation = [self frontCameraFinalImageOrientation];
+    }
+    else
+    {
+        returnImageOrientation = [self backCameraFinalImageOrientation];
+    }
+    NSLog(@"RETURNED image orientation:");
+    
+    return returnImageOrientation;
+}
+
+
+
+- (UIImageOrientation)frontCameraFinalImageOrientation
+{
+    NSLog(@"DEVICE orientation");
+    
+    NSLog(@"INITIAL interface orientation");
+    
+    
+    UIImageOrientation returnImageOrientation;
+    switch (self.previewDeviceOrientation) {
+        case UIDeviceOrientationLandscapeLeft:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationDown : UIImageOrientationUp;
+            break;
+        case UIDeviceOrientationLandscapeRight:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationUp : UIImageOrientationDown;
+            break;
+        case UIDeviceOrientationPortraitUpsideDown:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationRight : UIImageOrientationLeft;
+            break;
+        case UIDeviceOrientationPortrait:
+        default:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationLeft : UIImageOrientationRight;
+            break;
+    }
+   
+    return returnImageOrientation;
+    
+}
+
+
+- (UIImageOrientation)backCameraFinalImageOrientation
+{
+
+    NSLog(@"DEVICE orientation");
+    
+    NSLog(@"INITIAL interface orientation");
+    
+    UIImageOrientation returnImageOrientation;
+    switch (self.previewDeviceOrientation) {
+        case UIDeviceOrientationLandscapeLeft:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationDown : UIImageOrientationUp;
+            break;
+        case UIDeviceOrientationLandscapeRight:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationUp : UIImageOrientationDown;
+            break;
+        case UIDeviceOrientationPortraitUpsideDown:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationRight : UIImageOrientationLeft;
+            break;
+        case UIDeviceOrientationPortrait:
+        default:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationLeft : UIImageOrientationRight;
+            break;
+    }
+    
+    return returnImageOrientation;
+}
+
+
 
 @end
