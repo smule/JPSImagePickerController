@@ -562,6 +562,10 @@
         previewImageViewFrame = [self fullScreenCenteredRect:previewImageFrame];
         //previewFrame = self.capturePreviewView.frame;
     }
+    else
+    {
+         previewImageViewFrame = [self fullScreenCenteredRect:previewImageFrame];
+    }
     
     CGRect previewScrollViewFrame = [self fullScreenRect:previewImageFrame];
     
@@ -782,7 +786,7 @@
 
 - (void)use {
     UIImageOrientation finalImageOrientation = [self finalImageOrientation];
-      
+    
     UIImage *finalImage = [UIImage rotateImage:self.previewImage toOrientation:finalImageOrientation];
     
     [self.delegate jpsImagePicker:self didConfirmPicture:finalImage];
@@ -817,19 +821,20 @@
     CGFloat sizeRatio = 0;
     if ( imageAspectRatio > viewAspectRatio )
     {
-        xPos = ( fullScreenRect.size.width - inputRect.size.width ) / 2;
-        yPos = 0;
         sizeRatio = fullScreenRect.size.height / inputRect.size.height ;
         width = inputRect.size.width * sizeRatio;
         height = fullScreenRect.size.height;
+        xPos = ( fullScreenRect.size.width - width ) / 2;
+        yPos = 0;
+
     }
     else
     {
-        xPos = 0;
-        yPos = ( fullScreenRect.size.height - inputRect.size.height ) / 2;
         sizeRatio = fullScreenRect.size.width / inputRect.size.width;
         width = fullScreenRect.size.width;
         height = inputRect.size.height * sizeRatio;
+        xPos = 0;
+        yPos = ( fullScreenRect.size.height - height ) / 2;
     }
     
     return CGRectMake(xPos, yPos, width, height);
@@ -844,7 +849,7 @@
     CGRect fullScreenRect = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height);
     
     CGFloat imageAspectRatio = inputRect.size.width / inputRect.size.height;
-    CGFloat viewAspectRatio = fullScreenRect.size.width / fullScreenRect.size.width;
+    CGFloat viewAspectRatio = fullScreenRect.size.width / fullScreenRect.size.height;
     
     CGFloat width = 0;
     CGFloat height = 0;
