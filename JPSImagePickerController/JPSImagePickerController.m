@@ -14,7 +14,7 @@
 
 @interface JPSImagePickerController () <UIScrollViewDelegate>
 
-// Camera
+// Camera - "capture" means the live preview
 @property (nonatomic, strong) AVCaptureSession           * session;
 @property (nonatomic, strong) UIView                     * capturePreviewView;
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer * capturePreviewLayer;
@@ -32,8 +32,9 @@
 @property (nonatomic, strong) UIButton *cameraSwitchButton;
 @property (nonatomic, strong) JPSVolumeButtonHandler *volumeButtonHandler;
 
-// Preview
+// Preview - meaning the preview of the snapped photo
 @property (nonatomic, strong) UIImage     * previewImage;
+@property (nonatomic, strong) UIScrollView     * previewScrollView;
 @property (nonatomic, strong) UIImageView * previewImageView;
 @property (nonatomic, strong) UIButton    * retakeButton;
 @property (nonatomic, strong) UIButton    * useButton;
@@ -76,8 +77,9 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.tintColor = [UIColor whiteColor];
-    self.view.backgroundColor = [UIColor blackColor];
+    self.view.backgroundColor = [UIColor orangeColor];
     self.captureQueue = [[NSOperationQueue alloc] init];
+    [self addImageMask];
     [self addCameraButton];
     [self addCancelButton];
     [self addFlashButton];
@@ -85,6 +87,9 @@
     self.initialInterfaceOrientation = [[UIApplication sharedApplication] statusBarOrientation];
 
 }
+
+
+
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
@@ -157,19 +162,19 @@
     
     // Constraints
     NSLayoutConstraint *horizontal = [NSLayoutConstraint constraintWithItem:self.cameraButton
-                                                                  attribute:NSLayoutAttributeCenterX
+                                                                  attribute:NSLayoutAttributeRight
                                                                   relatedBy:NSLayoutRelationEqual
                                                                      toItem:self.view
-                                                                  attribute:NSLayoutAttributeCenterX
+                                                                  attribute:NSLayoutAttributeRight
                                                                  multiplier:1.0f
-                                                                   constant:0];
+                                                                   constant:-6.5f];
     NSLayoutConstraint *bottom = [NSLayoutConstraint constraintWithItem:self.cameraButton
                                                               attribute:NSLayoutAttributeBottom
                                                               relatedBy:NSLayoutRelationEqual
                                                                  toItem:self.view
                                                               attribute:NSLayoutAttributeBottom
                                                              multiplier:1.0f
-                                                               constant:-3.5f];
+                                                               constant:-6.5f];
     NSLayoutConstraint *width = [NSLayoutConstraint constraintWithItem:self.cameraButton
                                                              attribute:NSLayoutAttributeWidth
                                                              relatedBy:NSLayoutRelationEqual
@@ -307,7 +312,23 @@
         [device unlockForConfiguration];
         
         self.capturePreviewLayer = [[AVCaptureVideoPreviewLayer alloc] initWithSession:self.session];
-        self.capturePreviewLayer.frame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height - 69.0f - 73.0f);
+        
+        CGRect captureFrame;
+        if ( [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad )
+        {
+            //captureFrame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height - 69.0f - 73.0f);
+            captureFrame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height);
+            //captureFrame = CGRectMake(-128, 0, 1365, self.view.bounds.size.height);
+            //captureFrame = [self fullScreenCenteredRect:CGRectMake(0,0,1280,720)];
+            //captureFrame = [self fullScreenRect:CGRectMake(0,0,1280,720)];
+            //captureFrame.origin.x = 0;  //captureFrame.origin.x;
+        }
+        else
+        {
+            captureFrame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height);
+            //captureFrame = CGRectMake(0, -35.0f, 100, 200);
+        }
+        self.capturePreviewLayer.frame = captureFrame;
         self.capturePreviewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
         [self updateVideoOrientation];
         
@@ -322,16 +343,19 @@
 - (void)operationCompleted {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (!self.session) return;
-        self.capturePreviewView = [[UIView alloc] initWithFrame:CGRectOffset(self.capturePreviewLayer.frame, 0, 69.0f)];
+        CGFloat yOffset = 0;
+        if ( [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad )
+        {
+            //yOffset = 69.0f;
+            yOffset = 0;
+        }
+        self.capturePreviewView = [[UIView alloc] initWithFrame:CGRectOffset(self.capturePreviewLayer.frame, 0, yOffset)];
 #if TARGET_IPHONE_SIMULATOR
         self.capturePreviewView.frame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height - 73.0f);
         self.capturePreviewView.backgroundColor = [UIColor redColor];
 #endif
         [self.view insertSubview:self.capturePreviewView atIndex:0];
         [self.capturePreviewView.layer addSublayer:self.capturePreviewLayer];
-        [self addImageMask];
-        self.capturePreviewView.layer.mask = self.previewImageMask.layer;
-        [self.view sendSubviewToBack:self.previewImageMask];
         [self.view sendSubviewToBack:self.capturePreviewView];
         [self.session startRunning];
         if ([UIImagePickerController isCameraDeviceAvailable:UIImagePickerControllerCameraDeviceFront] &&
@@ -352,7 +376,6 @@
             return device;
         }
     }
-    
     return nil;
 }
 
@@ -383,12 +406,9 @@
                                             
                                             UIImage *rawCameraImage = [UIImage imageWithCGImage:[[[UIImage alloc] initWithData:imageData] CGImage]];
                                             
-                                            self.previewImageOrientation = [self previewImageOrientation];
-                                            NSLog(@"PREVIEW IMAGE orientation:");
                                             
-//                                            UIImage *rawCameraImage = [UIImage imageWithCGImage:[ [[UIImage alloc] initWithData:imageData] CGImage]
-//                                                                                 scale:1.0f
-//                                                                                     orientation:resolvedImageOrientation];
+                                            self.previewImageOrientation = [self formatPreviewImageOrientation];
+                                            NSLog(@"PREVIEW IMAGE orientation:");
                                             
                                             UIImage *rotatedImage = [UIImage rotateImage:rawCameraImage toOrientation:self.previewImageOrientation];
                                             
@@ -498,6 +518,7 @@
     
     // Preview UI
     [self addPreview];
+    //[self addImageMask];
     [self addRetakeButton];
     [self addUseButton];
     
@@ -506,35 +527,72 @@
     [self addConfirmationOverlayLabel];
 }
 
+- (void)addImageMask {
+    CGRect frame;
+    if ( [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad )
+    {
+        frame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height);
+    }
+    else
+    {
+        frame = CGRectMake(0, 0, self.view.bounds.size.height, self.view.bounds.size.width);
+    }
+    self.previewImageMask = [[JPSImageMask alloc] initWithFrame:frame];
+    [self.view addSubview:self.previewImageMask];
+    self.previewImageMask.userInteractionEnabled = NO;
+    
+}
+
 - (void)addPreview {
     if (self.previewImageView) {
         self.previewImageView.image = self.previewImage;
         self.previewImageView.hidden = NO;
+        if ( self.previewScrollView ) {
+            self.previewScrollView.hidden = NO;
+        }
         return;
     }
-    self.previewImageView = [[UIImageView alloc] initWithFrame:self.capturePreviewView.bounds];
+    
+    //CGRect previewFrame = self.capturePreviewView.bounds;
+    CGRect previewImageFrame = CGRectMake(0, 0, self.previewImage.size.width, self.previewImage.size.height);
+    CGRect previewImageViewFrame;
+    if ( [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad )
+    {
+        //previewFrame = CGRectMake(0, 0, self.previewImage.size.width, self.previewImage.size.height);
+        previewImageViewFrame = [self fullScreenCenteredRect:previewImageFrame];
+        //previewFrame = self.capturePreviewView.frame;
+    }
+    
+    CGRect previewScrollViewFrame = [self fullScreenRect:previewImageFrame];
+    
+    
+    self.previewImageView = [[UIImageView alloc] initWithFrame:previewImageViewFrame];
     self.previewImageView.contentMode = UIViewContentModeScaleAspectFit;
     self.previewImageView.image = self.previewImage;
     self.previewImageView.clipsToBounds = YES;
     
-    UIScrollView *previewScrollView = [[UIScrollView alloc] initWithFrame:self.capturePreviewView.frame];
-    previewScrollView.maximumZoomScale = 4.0f;
-    previewScrollView.minimumZoomScale = 1.0f;
-    previewScrollView.delegate = self;
-    previewScrollView.showsHorizontalScrollIndicator = NO;
-    previewScrollView.showsVerticalScrollIndicator = NO;
-    previewScrollView.alwaysBounceHorizontal = YES;
-    previewScrollView.alwaysBounceVertical = YES;
-    [previewScrollView addSubview:self.previewImageView];
-    previewScrollView.contentSize = self.previewImageView.frame.size;
-    previewScrollView.userInteractionEnabled = self.zoomEnabled;
-    [self.view addSubview:previewScrollView];
+    
+    self.previewScrollView = [[UIScrollView alloc] initWithFrame:previewScrollViewFrame];
+    self.previewScrollView.backgroundColor = [UIColor greenColor];
+    self.previewScrollView.maximumZoomScale = 4.0f;
+    self.previewScrollView.minimumZoomScale = 1.0f;
+    self.previewScrollView.delegate = self;
+    self.previewScrollView.showsHorizontalScrollIndicator = NO;
+    self.previewScrollView.showsVerticalScrollIndicator = NO;
+    self.previewScrollView.alwaysBounceHorizontal = YES;
+    self.previewScrollView.alwaysBounceVertical = YES;
+    [self.previewScrollView addSubview:self.previewImageView];
+    self.previewScrollView.contentSize = self.previewImageView.frame.size;
+    
+    self.previewScrollView.userInteractionEnabled = self.zoomEnabled;
+    [self.view addSubview:self.previewScrollView];
+    [self.view sendSubviewToBack:self.previewImageMask];
+    [self.view sendSubviewToBack:self.previewScrollView];
+    [self.view sendSubviewToBack:self.capturePreviewView];
+
 }
 
-- (void)addImageMask {
-    self.previewImageMask = [[JPSImageMask alloc] initWithFrame:self.view.bounds];
-    [self.view addSubview:self.previewImageMask];
-}
+
 
 - (void)addRetakeButton {
     if (self.retakeButton) {
@@ -718,12 +776,15 @@
     self.capturePreviewLayer.hidden = NO;
     
     self.cameraButton.enabled = YES;
+    self.previewScrollView.hidden = YES;
     [self updateFlashButton];
 }
 
 - (void)use {
     UIImageOrientation finalImageOrientation = [self finalImageOrientation];
+      
     UIImage *finalImage = [UIImage rotateImage:self.previewImage toOrientation:finalImageOrientation];
+    
     [self.delegate jpsImagePicker:self didConfirmPicture:finalImage];
 }
 
@@ -732,6 +793,80 @@
     NSURL *flashImagePathURL = [imagePickerBundle URLForResource:imageName withExtension:@"png"];
     return [UIImage imageWithContentsOfFile:flashImagePathURL.path];
 }
+
+
+
+#pragma mark - Image frame to bounds frame
+
+
+/**
+ *  Converted any rect with a different aspect ration than device screen to full-screen and centers it,
+ *  while preserving original aspect ratio
+ */
+- (CGRect)fullScreenCenteredRect:(CGRect)inputRect
+{
+    CGRect fullScreenRect = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height);
+    
+    CGFloat imageAspectRatio = inputRect.size.width / inputRect.size.height;
+    CGFloat viewAspectRatio = fullScreenRect.size.width / fullScreenRect.size.width;
+    
+    CGFloat xPos = 0;
+    CGFloat yPos = 0;
+    CGFloat width = 0;
+    CGFloat height = 0;
+    CGFloat sizeRatio = 0;
+    if ( imageAspectRatio > viewAspectRatio )
+    {
+        xPos = ( fullScreenRect.size.width - inputRect.size.width ) / 2;
+        yPos = 0;
+        sizeRatio = fullScreenRect.size.height / inputRect.size.height ;
+        width = inputRect.size.width * sizeRatio;
+        height = fullScreenRect.size.height;
+    }
+    else
+    {
+        xPos = 0;
+        yPos = ( fullScreenRect.size.height - inputRect.size.height ) / 2;
+        sizeRatio = fullScreenRect.size.width / inputRect.size.width;
+        width = fullScreenRect.size.width;
+        height = inputRect.size.height * sizeRatio;
+    }
+    
+    return CGRectMake(xPos, yPos, width, height);
+}
+
+/**
+ *  Converted any rect with a different aspect ration than device screen to full-screen and centers it,
+ *  while preserving original aspect ratio
+ */
+- (CGRect)fullScreenRect:(CGRect)inputRect
+{
+    CGRect fullScreenRect = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height);
+    
+    CGFloat imageAspectRatio = inputRect.size.width / inputRect.size.height;
+    CGFloat viewAspectRatio = fullScreenRect.size.width / fullScreenRect.size.width;
+    
+    CGFloat width = 0;
+    CGFloat height = 0;
+    CGFloat sizeRatio = 0;
+    if ( imageAspectRatio > viewAspectRatio )
+    {
+        sizeRatio = fullScreenRect.size.height / inputRect.size.height ;
+        width = inputRect.size.width * sizeRatio;
+        height = fullScreenRect.size.height;
+    }
+    else
+    {
+        sizeRatio = fullScreenRect.size.width / inputRect.size.width;
+        width = fullScreenRect.size.width;
+        height = inputRect.size.height * sizeRatio;
+    }
+    
+    return CGRectMake(0, 0, width, height);
+}
+
+
+
 
 #pragma mark - Orientation
 
@@ -765,21 +900,9 @@
 
 
 
-
-
-
-
-
-
 #pragma mark Image Preview Orientation
 
-- (UIImageOrientation)previewImageOrientation {
-    
-    NSLog(@"\n****** PREVIEW\n");
-
-    NSLog(@"CAMERA:");
-    
-    
+- (UIImageOrientation)formatPreviewImageOrientation {
     UIImageOrientation returnImageOrientation;
     if ( self.cameraPosition == AVCaptureDevicePositionFront )
     {
@@ -789,52 +912,27 @@
     {
         returnImageOrientation = [self backCameraPreviewImageOrientation];
     }
-    NSLog(@"RETURNED image orientation:");
-    
     return returnImageOrientation;
 }
 
 - (UIImageOrientation)frontCameraPreviewImageOrientation
 {
     self.previewDeviceOrientation = [UIDevice currentDevice].orientation;
-        NSLog(@"DEVICE orientation");
-    
-        NSLog(@"INITIAL interface orientation");
-    
     return  (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationUpMirrored : UIImageOrientationDownMirrored;
-    
 }
-
-
-
 
 - (UIImageOrientation)backCameraPreviewImageOrientation
 {
     self.previewDeviceOrientation = [UIDevice currentDevice].orientation;
-    NSLog(@"DEVICE orientation");
-    
-    NSLog(@"INITIAL interface orientation");
-    
     return  (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationDown : UIImageOrientationUp;
-
 }
-
-
-
 
 
 
 
 #pragma mark Image Final Orientation
 
-
 - (UIImageOrientation)finalImageOrientation {
-    
-    NSLog(@"\n****** FINAL!!!!\n");
-
-    NSLog(@"CAMERA:");
-    
-    
     UIImageOrientation returnImageOrientation;
     if ( self.cameraPosition == AVCaptureDevicePositionFront )
     {
@@ -844,20 +942,11 @@
     {
         returnImageOrientation = [self backCameraFinalImageOrientation];
     }
-    NSLog(@"RETURNED image orientation:");
-    
     return returnImageOrientation;
 }
-
-
 
 - (UIImageOrientation)frontCameraFinalImageOrientation
 {
-    NSLog(@"DEVICE orientation");
-    
-    NSLog(@"INITIAL interface orientation");
-    
-    
     UIImageOrientation returnImageOrientation;
     switch (self.previewDeviceOrientation) {
         case UIDeviceOrientationLandscapeLeft:
@@ -874,19 +963,11 @@
             returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationLeft : UIImageOrientationRight;
             break;
     }
-   
     return returnImageOrientation;
-    
 }
-
 
 - (UIImageOrientation)backCameraFinalImageOrientation
 {
-
-    NSLog(@"DEVICE orientation");
-    
-    NSLog(@"INITIAL interface orientation");
-    
     UIImageOrientation returnImageOrientation;
     switch (self.previewDeviceOrientation) {
         case UIDeviceOrientationLandscapeLeft:
@@ -903,7 +984,6 @@
             returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationLeft : UIImageOrientationRight;
             break;
     }
-    
     return returnImageOrientation;
 }
 
