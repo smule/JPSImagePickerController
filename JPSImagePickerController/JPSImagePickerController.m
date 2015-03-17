@@ -313,22 +313,7 @@
         
         self.capturePreviewLayer = [[AVCaptureVideoPreviewLayer alloc] initWithSession:self.session];
         
-        CGRect captureFrame;
-        if ( [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad )
-        {
-            //captureFrame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height - 69.0f - 73.0f);
-            captureFrame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height);
-            //captureFrame = CGRectMake(-128, 0, 1365, self.view.bounds.size.height);
-            //captureFrame = [self fullScreenCenteredRect:CGRectMake(0,0,1280,720)];
-            //captureFrame = [self fullScreenRect:CGRectMake(0,0,1280,720)];
-            //captureFrame.origin.x = 0;  //captureFrame.origin.x;
-        }
-        else
-        {
-            captureFrame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height);
-            //captureFrame = CGRectMake(0, -35.0f, 100, 200);
-        }
-        self.capturePreviewLayer.frame = captureFrame;
+        self.capturePreviewLayer.frame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height);
         self.capturePreviewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
         [self updateVideoOrientation];
         
@@ -343,13 +328,7 @@
 - (void)operationCompleted {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (!self.session) return;
-        CGFloat yOffset = 0;
-        if ( [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad )
-        {
-            //yOffset = 69.0f;
-            yOffset = 0;
-        }
-        self.capturePreviewView = [[UIView alloc] initWithFrame:CGRectOffset(self.capturePreviewLayer.frame, 0, yOffset)];
+        self.capturePreviewView = [[UIView alloc] initWithFrame:CGRectOffset(self.capturePreviewLayer.frame, 0, 0)];
 #if TARGET_IPHONE_SIMULATOR
         self.capturePreviewView.frame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height - 73.0f);
         self.capturePreviewView.backgroundColor = [UIColor redColor];
@@ -388,7 +367,6 @@
 - (void)takePicture {
     if (!self.cameraButton.enabled) return;
     
-    NSLog(@"\n------------------------------------- SNAP ---------------\n");
     AVCaptureStillImageOutput *output = self.session.outputs.lastObject;
     AVCaptureConnection *videoConnection = output.connections.lastObject;
     if (!videoConnection) {
@@ -403,13 +381,8 @@
                                             if (!imageDataSampleBuffer || error) return;
                                             
                                             NSData *imageData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageDataSampleBuffer];
-                                            
                                             UIImage *rawCameraImage = [UIImage imageWithCGImage:[[[UIImage alloc] initWithData:imageData] CGImage]];
-                                            
-                                            
                                             self.previewImageOrientation = [self formatPreviewImageOrientation];
-                                            NSLog(@"PREVIEW IMAGE orientation:");
-                                            
                                             UIImage *rotatedImage = [UIImage rotateImage:rawCameraImage toOrientation:self.previewImageOrientation];
                                             
                                             self.previewImage = rotatedImage;
@@ -518,7 +491,6 @@
     
     // Preview UI
     [self addPreview];
-    //[self addImageMask];
     [self addRetakeButton];
     [self addUseButton];
     
@@ -552,21 +524,9 @@
         }
         return;
     }
-    
-    //CGRect previewFrame = self.capturePreviewView.bounds;
+
     CGRect previewImageFrame = CGRectMake(0, 0, self.previewImage.size.width, self.previewImage.size.height);
-    CGRect previewImageViewFrame;
-    if ( [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad )
-    {
-        //previewFrame = CGRectMake(0, 0, self.previewImage.size.width, self.previewImage.size.height);
-        previewImageViewFrame = [self fullScreenCenteredRect:previewImageFrame];
-        //previewFrame = self.capturePreviewView.frame;
-    }
-    else
-    {
-         previewImageViewFrame = [self fullScreenCenteredRect:previewImageFrame];
-    }
-    
+    CGRect previewImageViewFrame = [self fullScreenCenteredRect:previewImageFrame];
     CGRect previewScrollViewFrame = [self fullScreenRect:previewImageFrame];
     
     
@@ -905,7 +865,7 @@
 
 
 
-#pragma mark Image Preview Orientation
+#pragma mark - Image Preview Orientation
 
 - (UIImageOrientation)formatPreviewImageOrientation {
     UIImageOrientation returnImageOrientation;
@@ -935,7 +895,7 @@
 
 
 
-#pragma mark Image Final Orientation
+#pragma mark - Image Final Orientation
 
 - (UIImageOrientation)finalImageOrientation {
     UIImageOrientation returnImageOrientation;
