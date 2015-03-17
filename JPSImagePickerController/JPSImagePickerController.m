@@ -77,7 +77,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.tintColor = [UIColor whiteColor];
-    self.view.backgroundColor = [UIColor orangeColor];
+    self.view.backgroundColor = [UIColor blackColor];
     self.captureQueue = [[NSOperationQueue alloc] init];
     [self addImageMask];
     [self addCameraButton];
@@ -85,7 +85,6 @@
     [self addFlashButton];
     [self addCameraSwitchButton];
     self.initialInterfaceOrientation = [[UIApplication sharedApplication] statusBarOrientation];
-
 }
 
 
@@ -501,13 +500,13 @@
 
 - (void)addImageMask {
     CGRect frame;
-    if ( [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad )
+    if ( self.view.frame.size.width > self.view.frame.size.height )
     {
-        frame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height);
+        frame = CGRectMake(0, 0, self.view.frame.size.width, self.view.frame.size.height);
     }
     else
     {
-        frame = CGRectMake(0, 0, self.view.bounds.size.height, self.view.bounds.size.width);
+        frame = CGRectMake(0, 0, self.view.frame.size.height, self.view.frame.size.width);
     }
     self.previewImageMask = [[JPSImageMask alloc] initWithFrame:frame];
     [self.view addSubview:self.previewImageMask];
@@ -537,7 +536,7 @@
     
     
     self.previewScrollView = [[UIScrollView alloc] initWithFrame:previewScrollViewFrame];
-    self.previewScrollView.backgroundColor = [UIColor greenColor];
+    self.previewScrollView.backgroundColor = [UIColor blackColor];
     self.previewScrollView.maximumZoomScale = 4.0f;
     self.previewScrollView.minimumZoomScale = 1.0f;
     self.previewScrollView.delegate = self;
