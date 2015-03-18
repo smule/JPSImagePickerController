@@ -380,16 +380,22 @@
                                             if (!imageDataSampleBuffer || error) return;
                                             
                                             NSData *imageData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageDataSampleBuffer];
-                                            UIImage *rawCameraImage = [UIImage imageWithCGImage:[[[UIImage alloc] initWithData:imageData] CGImage]];
-                                            self.previewImageOrientation = [self formatPreviewImageOrientation];
-                                            UIImage *rotatedImage = [UIImage rotateImage:rawCameraImage toOrientation:self.previewImageOrientation];
                                             
-                                            self.previewImage = rotatedImage;
+                                            UIImage *rawCameraImage = [UIImage imageWithCGImage:[[[UIImage alloc] initWithData:imageData] CGImage]];
+                                            
+                                            self.previewImageOrientation = [self formatPreviewImageOrientation];
+                                            
                                             if (self.editingEnabled) {
+                                                UIImage *rotatedImage = [UIImage rotateImage:rawCameraImage toOrientation:self.previewImageOrientation];
+                                                self.previewImage = rotatedImage;
                                                 [self showPreview];
                                             }
-                                            
-                                            //[self.delegate jpsImagePicker:self didTakePicture:rotatedImage];
+                                            else {
+                                                UIImageOrientation uneditedImageOrientation = [self formatUneditedImageOrientation];
+                                                UIImage *uneditedRotatedImage = [UIImage rotateImage:rawCameraImage toOrientation:uneditedImageOrientation];
+                                                [self.delegate jpsImagePicker:self didTakePicture:uneditedRotatedImage];
+                                            }
+
                                         }];
 }
 
@@ -890,6 +896,68 @@
     self.previewDeviceOrientation = [UIDevice currentDevice].orientation;
     return  (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationDown : UIImageOrientationUp;
 }
+
+
+
+
+#pragma mark - Image Unediting Orientation
+
+- (UIImageOrientation)formatUneditedImageOrientation {
+    UIImageOrientation returnImageOrientation;
+    if ( self.cameraPosition == AVCaptureDevicePositionFront )
+    {
+        returnImageOrientation = [self frontCameraUneditedImageOrientation];
+    }
+    else
+    {
+        returnImageOrientation = [self backCameraUneditedImageOrientation];
+    }
+    return returnImageOrientation;
+}
+
+- (UIImageOrientation)frontCameraUneditedImageOrientation
+{
+    UIImageOrientation returnImageOrientation;
+    switch (self.previewDeviceOrientation) {
+        case UIDeviceOrientationLandscapeLeft:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationDownMirrored : UIImageOrientationDownMirrored;
+            break;
+        case UIDeviceOrientationLandscapeRight:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationUpMirrored : UIImageOrientationUpMirrored;
+            break;
+        case UIDeviceOrientationPortraitUpsideDown:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationRightMirrored : UIImageOrientationLeft;
+            break;
+        case UIDeviceOrientationPortrait:
+        default:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationLeftMirrored : UIImageOrientationRight;
+            break;
+    }
+    return returnImageOrientation;
+}
+
+- (UIImageOrientation)backCameraUneditedImageOrientation
+{
+    UIImageOrientation returnImageOrientation;
+    switch (self.previewDeviceOrientation) {
+        case UIDeviceOrientationLandscapeLeft:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationUp : UIImageOrientationUp;
+            break;
+        case UIDeviceOrientationLandscapeRight:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationDown : UIImageOrientationDown;
+            break;
+        case UIDeviceOrientationPortraitUpsideDown:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationLeft : UIImageOrientationLeft;
+            break;
+        case UIDeviceOrientationPortrait:
+        default:
+            returnImageOrientation = (self.initialInterfaceOrientation == UIInterfaceOrientationLandscapeLeft) ? UIImageOrientationRight : UIImageOrientationRight;
+            break;
+    }
+    return returnImageOrientation;
+}
+
+
 
 
 
