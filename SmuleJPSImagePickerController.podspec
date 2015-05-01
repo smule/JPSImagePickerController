@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name     = 'SmuleJPSImagePickerController'
-  s.version  = '0.0.1'
+  s.version  = '0.0.4'
   s.platform = :ios, "7.0"
   s.license  = 'MIT'
   s.summary  = 'A pixel-perfect clone of iOS 7\'s UIImagePickerController, with a few improvements.'

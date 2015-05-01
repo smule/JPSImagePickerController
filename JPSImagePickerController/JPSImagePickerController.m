@@ -8,7 +8,6 @@
 
 #import "JPSImagePickerController.h"
 #import "JPSCameraButton.h"
-#import "JPSVolumeButtonHandler.h"
 #import "JPSImageMask.h"
 #import "UIImage+Rotation.h"
 
@@ -30,7 +29,6 @@
 @property (nonatomic, strong) UIButton *cancelButton;
 @property (nonatomic, strong) UIButton *flashButton;
 @property (nonatomic, strong) UIButton *cameraSwitchButton;
-@property (nonatomic, strong) JPSVolumeButtonHandler *volumeButtonHandler;
 
 // Preview - meaning the preview of the snapped photo
 @property (nonatomic, strong) UIImage     * previewImage;
@@ -99,7 +97,6 @@
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    [self addVolumeButtonHandler];
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
@@ -114,16 +111,8 @@
     }
     [self.session stopRunning];
     self.session = nil;
-    self.volumeButtonHandler = nil;
 }
 
-- (void)addVolumeButtonHandler {
-    if (self.volumeButtonTakesPicture) {
-        self.volumeButtonHandler = [JPSVolumeButtonHandler volumeButtonHandlerWithUpBlock:^{
-            [self takePicture];
-        } downBlock:nil];
-    }
-}
 
 /**
  * Forces this image picker class to not rotate interfaces, because the image preview doesn't right itself
