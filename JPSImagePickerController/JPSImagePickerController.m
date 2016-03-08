@@ -121,9 +121,9 @@
  *
  * WARNING: this method is deprecated in iOS 8, but I'm forced to include it at present for iOS 7 back compatibility
  */
-- (NSUInteger)supportedInterfaceOrientations
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations
 {
-    NSUInteger orientations;
+    UIInterfaceOrientationMask orientations;
     switch ( self.initialInterfaceOrientation )
     {
         case UIInterfaceOrientationLandscapeLeft:
